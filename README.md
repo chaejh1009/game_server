@@ -1,6 +1,6 @@
 # Game Server
 
-Django와 Channels로 구성한 수업용 게임 서버입니다. MySQL에 플레이어 상태와 게임 이벤트를 저장하며, 세션 인증을 거친 WebSocket 명령으로 이동과 코인 채집을 처리합니다.
+Django와 Channels로 구성한 수업용 게임 서버입니다. MySQL에 플레이어 상태와 게임 이벤트를 저장하고, 세션 인증을 거친 WebSocket 명령으로 이동과 코인 채집을 처리합니다. 저장된 게임 이벤트는 Kafka로 발행하거나 관찰할 수 있습니다.
 
 ## 현재 구현 상태
 
@@ -9,10 +9,13 @@ Django와 Channels로 구성한 수업용 게임 서버입니다. MySQL에 플�
 - 트랜잭션과 행 잠금(`select_for_update`)을 이용한 상태 변경 및 이벤트 기록
 - 플레이어별 `command_id` 중복 확인으로 성공한 명령의 재실행 방지
 - 연결별 명령 간격 제한: 0.2초 미만이면 `too_fast` 반환
+- 상태 변경과 `GameEvent` 기록을 하나의 트랜잭션으로 처리
+- 미발행 `GameEvent`를 Kafka에 발행하고 broker ack 이후 `published_at` 기록
+- Kafka 이벤트 관찰 및 최근 이벤트 JSON 샘플 추출용 관리 명령
 
 `/play/`는 현재 사용자와 방 정보를 보여주는 준비 화면입니다. 지도와 이동·채집 조작 UI는 아직 없습니다. 같은 방의 다른 플레이어에게 상태를 방송하는 기능도 구현되어 있지 않습니다.
 
-`kafka-python`은 의존성에 포함되어 있지만 Kafka 발행·소비 코드는 없습니다. `analytics` 앱은 기본 골격만 있으며, 현재 서버 실행에 Kafka는 필요하지 않습니다.
+`analytics` 앱은 기본 골격만 있습니다. HTTP/WebSocket 서버를 실행할 때 Kafka broker에 연결하지는 않지만, 설정을 읽기 위해 `KAFKA_BOOTSTRAP_SERVERS` 환경 변수는 필요합니다. 이벤트 발행·관찰 명령을 실행하려면 해당 Kafka broker가 실행 중이어야 합니다.
 
 ## 로컬 실행
 
@@ -38,9 +41,12 @@ DB_USER=game_user
 DB_PASSWORD=replace_with_your_password
 DB_HOST=127.0.0.1
 DB_PORT=3306
+KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092
+KAFKA_EVENT_TOPIC=game.events.v1
+KAFKA_GROUP_ID=village-watch-v1
 ```
 
-`DB_NAME`, `DB_USER`, `DB_PASSWORD`는 필수입니다. `DB_HOST`와 `DB_PORT`의 기본값은 각각 `127.0.0.1`, `3306`입니다. `.env`는 Git 추적 대상에서 제외됩니다.
+`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `KAFKA_BOOTSTRAP_SERVERS`는 필수입니다. `DB_HOST`와 `DB_PORT`의 기본값은 각각 `127.0.0.1`, `3306`입니다. `KAFKA_EVENT_TOPIC`의 기본값은 `game.events.v1`입니다. `KAFKA_BOOTSTRAP_SERVERS`에는 여러 broker를 쉼표로 구분해 입력할 수 있습니다. `.env`는 Git 추적 대상에서 제외됩니다.
 
 ### 3. 테이블 및 플레이어 생성
 
@@ -106,17 +112,72 @@ Daphne가 개발 서버를 제공하며 HTTP와 WebSocket을 함께 처리합니
 
 초기 연결과 HTTP 상태 조회 응답에는 `command_id`가 없습니다. 명령 오류는 `type`, `code`, `command_id` 필드로 반환합니다. 주요 오류 코드는 `object_required`, `too_fast`, `invalid_direction`, `outside_map`, `not_at_gather_tile`, `unknown_action`입니다.
 
+## Kafka 이벤트 파이프라인
+
+게임 명령이 성공하면 플레이어 상태와 `GameEvent`가 같은 트랜잭션에서 저장됩니다. `GameEvent.published_at`이 비어 있는 이벤트만 발행 대상입니다.
+
+### 이벤트 발행
+
+```bash
+# 미발행 이벤트를 최대 100건 처리한 뒤 종료
+python manage.py publish_game_events --once
+
+# 미발행 이벤트를 계속 감시하고 발행
+python manage.py publish_game_events --batch-size 100
+```
+
+발행 명령은 `event_time`, `event_id` 순서로 이벤트를 읽고, Kafka의 `acks=all` 응답을 받은 뒤에만 `published_at`을 기록합니다. Kafka 메시지의 key는 `player_id`입니다. `--once`를 사용하면 한 번 읽은 batch만 처리하고 종료합니다.
+
+### 이벤트 관찰
+
+```bash
+python manage.py watch_game_events --limit 10
+python manage.py watch_game_events --group village-watch-v1 --limit 50
+```
+
+관찰 명령은 Kafka 이벤트를 JSON으로 출력하며 플레이어 상태나 `GameEvent`를 변경하지 않습니다. 기본 consumer group은 `village-watch-v1`, 기본 출력 개수는 10건입니다.
+
+Kafka에 발행되는 이벤트 envelope은 다음 형태입니다.
+
+```json
+{
+  "schema_version": 1,
+  "event_id": "uuid",
+  "event_type": "player.moved",
+  "player_id": 1,
+  "room_id": "room-01",
+  "event_time": "2026-09-14T12:00:00+09:00",
+  "payload": {
+    "command_id": "uuid",
+    "x": 1,
+    "y": 0,
+    "coins": 0,
+    "version": 1
+  }
+}
+```
+
+`event_type`은 현재 `player.moved`와 `player.gathered`를 사용합니다.
+
+### 이벤트 샘플 저장
+
+```bash
+python manage.py export_event_sample
+```
+
+가장 최근에 저장된 이벤트 한 건을 프로젝트 상위 디렉터리의 `data/samples/game-event.json`에 저장합니다. 이벤트가 하나도 없으면 먼저 게임에서 이동 또는 채집을 실행해야 합니다.
+
 ## 프로젝트 구조
 
 ```text
 config/                         Django 설정, HTTP·ASGI 라우팅
 game/
   models.py                     Player, GameEvent 모델
-  services.py                   이동·채집, 중복 명령 확인, 이벤트 저장
+  services.py                   이동·채집, 중복 명령 확인, 이벤트 저장·직렬화
   consumers.py                  WebSocket 인증 및 명령 수신
   views.py                      준비 화면과 상태 조회 API
   routing.py                    WebSocket 경로
-  management/commands/          create_player 명령
+  management/commands/          플레이어 생성, 이벤트 발행·관찰·샘플 추출
   migrations/                   데이터베이스 마이그레이션
   templates/                    로그인 및 준비 화면
 analytics/                      분석 앱 기본 골격
@@ -133,4 +194,4 @@ python manage.py test
 
 현재 `game/tests.py`와 `analytics/tests.py`에는 테스트 케이스가 없습니다. `check`는 Django 설정 점검이며 DB 연결이나 게임 동작까지 검증하지는 않습니다.
 
-현재 설정은 로컬 수업·개발용입니다. `DEBUG=True`, 전체 호스트 허용, 코드에 고정된 `SECRET_KEY`, 메모리 기반 채널 레이어를 사용합니다. 운영 배포 시 설정 분리와 비밀키 관리가 필요하며, 여러 프로세스 사이의 메시지 공유가 필요하면 채널 레이어도 변경해야 합니다.
+현재 설정은 로컬 수업·개발용입니다. `DEBUG=True`, 전체 호스트 허용, 코드에 고정된 `SECRET_KEY`, 메모리 기반 채널 레이어를 사용합니다. 운영 배포 시 설정 분리와 비밀키 관리가 필요하며, 여러 프로세스 사이의 메시지 공유가 필요하면 채널 레이어도 변경해야 합니다. Kafka 발행 명령도 운영 환경에서는 별도 worker 프로세스로 실행하는 구성이 필요합니다.

@@ -122,6 +122,9 @@ USE_I18N = True
 USE_TZ = True
 PROJECT_DIR = BASE_DIR.parent
 DATA_DIR = PROJECT_DIR / "data"
+KAFKA_BOOTSTRAP_SERVERS = os.environ["KAFKA_BOOTSTRAP_SERVERS"].split(",")
+KAFKA_EVENT_TOPIC = os.environ.get("KAFKA_EVENT_TOPIC", "game.events.v1")
+KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "village-watch-v1")
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

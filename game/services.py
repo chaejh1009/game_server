@@ -18,6 +18,18 @@ def serialize_player(player):
         "version": player.version,
     }
 
+def serialize_event(event):
+    return {
+        "schema_version": 1,
+        "event_id": str(event.event_id),
+        "event_type": event.event_type,
+        "player_id": event.player_id,
+        "room_id": event.room_id,
+        "event_time": event.event_time.isoformat(),
+        "payload": event.payload,
+    }
+
+
 @transaction.atomic
 def apply_command(user_id, command):
     
