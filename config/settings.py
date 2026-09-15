@@ -141,3 +141,5 @@ CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/play/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
+SPARK_SUBMIT = os.environ["SPARK_SUBMIT"]
+SPARK_MASTER = os.environ.get("SPARK_MASTER", "spark://127.0.0.1:7077")

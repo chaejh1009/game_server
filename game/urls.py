@@ -6,4 +6,5 @@ app_name = "game"
 urlpatterns = [
     path("play/", views.play, name="play"),
     path("api/player/", views.player_view, name="player"),
+    path("api/delivery/",views.delivery_view,name ="delivery")
 ]
