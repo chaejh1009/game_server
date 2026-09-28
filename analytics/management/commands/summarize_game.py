@@ -11,20 +11,26 @@ class Command(BaseCommand):
     help = "행동 로그를 기존 Native Spark 클러스터에서 집계합니다."
 
     def add_arguments(self, parser):
-        parser.add_argument("--source", choices=["raw"], default="raw")
+        parser.add_argument("--source", choices=["raw", "delta"], default="raw")
         parser.add_argument("--data-dir", default=str(settings.DATA_DIR))
         parser.add_argument("--cores", type=int, choices=[1, 2], default=2)
 
     def handle(self, *args, **options):
         command = [
-            settings.SPARK_SUBMIT,
-            "--master", settings.SPARK_MASTER,
-            "--deploy-mode", "client",
-            "--executor-cores", "1",
+            settings.SPARK_SUBMIT, "--master", settings.SPARK_MASTER,
+            "--deploy-mode", "client", "--executor-cores", "1",
             "--total-executor-cores", str(options["cores"]),
             "--conf", f"spark.pyspark.python={sys.executable}",
             "--conf", f"spark.pyspark.driver.python={sys.executable}",
-            str(settings.BASE_DIR / "spark_jobs" / "game_batch.py"),
+        ]
+        if options["source"] == "delta":
+            command += [
+                "--packages", settings.DELTA_PACKAGE,
+                "--conf", "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension",
+                "--conf", "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            ]
+        command += [
+            str(settings.PROJECT_DIR / "game_server" / "spark_jobs" / "game_batch.py"),
             "--data-dir", str(Path(options["data_dir"]).resolve()),
             "--source", options["source"],
         ]

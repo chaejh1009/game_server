@@ -1,9 +1,10 @@
 import json
+
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from game.transforms import ACTION_LABELS
-from django.contrib.auth.decorators import login_required
 
 @require_GET
 def summary_view(request):
@@ -54,3 +55,49 @@ def actions_snapshot(request):
             "by_room": summary["by_room"],
         },
     })
+
+@require_GET
+def windows_view(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "login_required"}, status=401)
+    path = settings.DATA_DIR / "marts" / "windows.json"
+    if not path.exists():
+        return JsonResponse({"available": False, "windows": []})
+    result = json.loads(path.read_text(encoding="utf-8"))
+    return JsonResponse({"available": True, **result})
+
+@login_required
+def metrics_snapshot(request):
+    path = settings.DATA_DIR / "marts" / "game-metrics.json"
+    if not path.exists():
+        return JsonResponse({"available": False, "metrics": None})
+    report = json.loads(path.read_text(encoding="utf-8"))
+    return JsonResponse({"available": True, "metrics": report})
+
+
+@login_required
+def load_snapshot(request):
+    path = settings.DATA_DIR / "load" / "run-50.json"
+    if not path.exists():
+        return JsonResponse({"available": False, "load": None})
+    source = json.loads(path.read_text(encoding="utf-8"))
+    keys = [
+        "generated_at", "measurement_started_at", "profile",
+        "connected_success", "connected_peak",
+        "attempt_count", "success_count", "error_count",
+        "elapsed_seconds", "success_per_second",
+        "rtt_sample_count", "rtt_mean_ms", "rtt_p95_ms",
+    ]
+    report = {key: source[key] for key in keys}
+    by_room = {}
+    for row in source["by_player"]:
+        item = by_room.setdefault(
+            row["room_id"], {"connected": 0, "success_count": 0}
+        )
+        item["connected"] += int(row["connected"])
+        item["success_count"] += row["success_count"]
+    report["by_room"] = [
+        {"room_id": key, **value}
+        for key, value in sorted(by_room.items())
+    ]
+    return JsonResponse({"available": True, "load": report})

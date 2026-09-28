@@ -18,6 +18,9 @@ def main():
     print("window kind:", args.kind)
     print("data directory:", data_dir)
 
+    progress_path = data_dir / 'marts' / 'progress-windows-tumbling.json'
+    progress_path.parent.mkdir(parents=True, exist_ok=True)
+
     schema = '''schema_version int,event_id string,event_type string,player_id long,
         room_id string,event_time string,payload struct<command_id:string,x:int,y:int,
         coins:long,version:long,action_label:string>'''
@@ -55,36 +58,53 @@ def main():
 
     timed_actions = actions.withWatermark('event_time', '10 seconds')
 
+    duration = '10 seconds' if args.kind == 'tumbling' else '20 seconds'
     windows = (
-        timed_actions
-        .groupBy(F.window('event_time', '10 seconds'), 'event_type')
+        actions.withWatermark('event_time', '10 seconds')
+        .groupBy(F.window('event_time', duration, '10 seconds'), 'event_type')
         .count()
     )
 
     final_windows = windows.select(
-        F.lit('tumbling').alias('kind'),
+        F.lit(args.kind).alias('kind'),
         F.col('window.start').alias('window_start'),
         F.col('window.end').alias('window_end'),
-        'event_type',
-        'count',
+        'event_type', 'count',
     )
 
-    output = data_dir / 'lake' / 'windows' / 'tumbling'
-    checkpoint = data_dir / 'checkpoints' / 'windows' / 'tumbling'
-    print('window output:', output)
-    print('window checkpoint:', checkpoint)
+    output = data_dir / 'lake' / 'windows' / args.kind
+    checkpoint = data_dir / 'checkpoints' / 'windows' / args.kind
+    progress_path = data_dir / 'marts' / f'progress-windows-{args.kind}.json'
+    progress_path.parent.mkdir(parents=True, exist_ok=True)
 
     query = (
         final_windows.writeStream.format('parquet')
         .outputMode('append')
         .option('path', output.as_uri())
         .option('checkpointLocation', checkpoint.as_uri())
-        .queryName('game-windows-tumbling')
+        .queryName(f'game-windows-{args.kind}')
         .trigger(processingTime='5 seconds')
         .start()
     )
+    last_batch_id = None
     try:
-        query.awaitTermination()
+        while not query.awaitTermination(5):
+            snapshot = query.lastProgress
+            progress = (json.loads(snapshot.json) if hasattr(snapshot, "json") else snapshot) if snapshot is not None else None
+            if progress and progress['batchId'] != last_batch_id:
+                print(json.dumps({
+                    'batchId': progress['batchId'],
+                    'numInputRows': progress.get('numInputRows'),
+                    'eventTime': progress.get('eventTime', {}),
+                    'stateOperators': progress.get('stateOperators', []),
+                }, ensure_ascii=False))
+                temporary = progress_path.with_suffix('.tmp')
+                temporary.write_text(
+                    json.dumps(progress, ensure_ascii=False, indent=2),
+                    encoding='utf-8',
+                )
+                temporary.replace(progress_path)
+                last_batch_id = progress['batchId']
     except KeyboardInterrupt:
         pass
     finally:

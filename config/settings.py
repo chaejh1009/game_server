@@ -143,3 +143,6 @@ LOGIN_REDIRECT_URL = "/play/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
 SPARK_SUBMIT = os.environ["SPARK_SUBMIT"]
 SPARK_MASTER = os.environ.get("SPARK_MASTER", "spark://127.0.0.1:7077")
+
+KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.3"
+DELTA_PACKAGE = "io.delta:delta-spark_4.1_2.13:4.1.0"

@@ -18,10 +18,13 @@ from django.contrib import admin
 from django.urls import path, include
 from analytics import views as analytics_views
 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("game.urls")),
     path("api/analytics/",include("analytics.urls")),
     path("api/analytics/actions/", analytics_views.actions_snapshot, name="action-summary"),
+    path("api/analytics/metrics/", analytics_views.metrics_snapshot),
+    path("api/analytics/load/", analytics_views.load_snapshot),
 ]

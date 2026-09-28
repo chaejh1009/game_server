@@ -7,7 +7,7 @@ from pyspark.sql import functions as F
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data-dir", required=True)
-parser.add_argument("--source", choices=["raw"], default="raw")
+parser.add_argument("--source", choices=["raw", "delta"], default="raw")
 args = parser.parse_args()
 data_dir = Path(args.data_dir).resolve()
 
@@ -17,13 +17,20 @@ spark = (SparkSession.builder.appName("village-game-batch")
     .getOrCreate())
 
 schema = "schema_version int, event_id string, event_type string, player_id long, room_id string, event_time string, payload struct<command_id:string,x:int,y:int,coins:long,version:long>"
-records = spark.read.schema(schema).json((data_dir / "raw" / "game-events.jsonl").as_uri())
+#records = spark.read.schema(schema).json((data_dir / "raw" / "game-events.jsonl").as_uri())
+if args.source == "delta":
+    records = spark.read.format("delta").load((data_dir / "lake" / "silver" / "game_actions").as_uri())
+else:
+    records = spark.read.schema(schema).json((data_dir / "raw" / "game-events.jsonl").as_uri())
 records.printSchema()
 
-records.select("event_id", "event_type", "room_id", "payload.x", "payload.version").orderBy("event_id").show(5, truncate=False)
 
-actions = records.filter((F.col("schema_version") == 1) & F.col("event_id").isNotNull()).select("event_id", "room_id", "event_type").dropDuplicates(["event_id"])
+#records.select("event_id", "event_type", "room_id", "payload.x", "payload.version").orderBy("event_id").show(5, truncate=False)
+records.select("event_id", "event_type", "room_id").orderBy("event_id").show(5, truncate=False)
+
 record_count = records.count()
+actions = records.filter((F.col("schema_version") == 1) & F.col("event_id").isNotNull())
+actions = actions.select("event_id", "room_id", "event_type").dropDuplicates(["event_id"])
 event_count = actions.count()
 
 by_action = [

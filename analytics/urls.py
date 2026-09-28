@@ -6,4 +6,5 @@ app_name = "analytics"
 urlpatterns = [
     path("", views.summary_view, name="summary"),
     path("ingest/", ingest_summary_view, name="ingest-summary"),
+    path("windows/",views.windows_view,name ="windows"),
     ]
