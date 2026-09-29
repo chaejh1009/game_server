@@ -245,3 +245,14 @@ ASGI 프로세스 수: 1
     }
   ]
 }
+
+---
+{
+  "run": "run-50",
+  "clients": 50,
+  "seconds": 30,
+  "interval_seconds": 1.0,
+  "room_distribution": [20, 20, 10],
+  "asgi_processes": 1,
+  "compare_with": "run-20"
+}
