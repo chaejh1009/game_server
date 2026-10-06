@@ -11,4 +11,6 @@ urlpatterns = [
     path("api/history/", game_views.history, name="game-history"),
     path("api/auth/csrf/",views.csrf_view,name="csrf",),
     path("api/auth/login/",views.api_login,name="api-login",),
+    path("ads-preview/", views.ad_preview, name="ad-preview"),
+    path("api/ads/decision/", views.ad_decision, name="ad-decision"),
 ]

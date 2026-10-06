@@ -62,6 +62,9 @@ KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092
 KAFKA_EVENT_TOPIC=game.events.v1
 SPARK_SUBMIT=/absolute/path/to/spark/bin/spark-submit
 SPARK_MASTER=spark://127.0.0.1:7077
+ADS_BASE_URL=http://127.0.0.1:8001
+ADS_MEDIA_ID=village-game
+ADS_MEDIA_KEY=replace_with_your_media_key
 ```
 
 | 변수 | 필수 여부·기본값 |
@@ -72,6 +75,9 @@ SPARK_MASTER=spark://127.0.0.1:7077
 | `KAFKA_EVENT_TOPIC` | 기본값 `game.events.v1` |
 | `SPARK_SUBMIT` | 필수, Spark 실행 시 실제 `spark-submit` 경로 사용 |
 | `SPARK_MASTER` | 기본값 `spark://127.0.0.1:7077` |
+| `ADS_BASE_URL` | 기본값 `http://127.0.0.1:8001` |
+| `ADS_MEDIA_ID` | 기본값 `village-game`, 광고 서버 매체 ID와 일치 |
+| `ADS_MEDIA_KEY` | 필수, 광고 서버 매체 키와 일치 |
 
 `.env`는 Git 추적 대상에서 제외됩니다. `KAFKA_GROUP_ID`도 설정에 선언되어 있지만 현재 consumer 명령은 각 명령의 기본 group과 `--group` 옵션을 사용합니다.
 
@@ -393,6 +399,10 @@ python manage.py check
 python manage.py test
 ```
 
-현재 테스트는 `game/test_transforms.py` 4건과 `analytics/test_ingest_views.py` 3건입니다. 행동 선별·원본 보존, 수집 집계 API의 인증·미생성·정상 조회를 검증하며 DB를 사용하지 않습니다. `game/tests.py`와 `analytics/tests.py`는 기본 골격만 있습니다. 게임 DB 갱신, WebSocket, Kafka, Spark를 연결한 통합 테스트는 포함하지 않습니다. `check`도 DB 연결이나 외부 서비스의 동작을 확인하지 않습니다.
+현재 테스트는 `game/test_transforms.py` 4건, `analytics/test_ingest_views.py` 3건과 `game/test_ad_gateway.py` 4건입니다. 광고 중계 테스트는 설정 로딩, 인증된 선택의 서버 간 payload·키 전달, 미인증 차단, 광고 서버 장애의 503 응답을 검증합니다. 행동 선별·원본 보존, 수집 집계 API의 인증·미생성·정상 조회를 검증하며 DB를 사용하지 않습니다. `game/tests.py`와 `analytics/tests.py`는 기본 골격만 있습니다. 게임 DB 갱신, WebSocket, Kafka, Spark를 연결한 통합 테스트는 포함하지 않습니다. `check`도 DB 연결이나 외부 서비스의 동작을 확인하지 않습니다.
 
 현재 설정은 로컬 수업·개발용입니다. `DEBUG=True`, 전체 호스트 허용, 코드에 고정된 `SECRET_KEY`, 메모리 기반 채널 레이어와 접속자 사전을 사용합니다. 여러 서버 프로세스에서 운영하려면 채널 레이어와 접속자 관리를 공유해야 합니다. Kafka 발행·변환과 Spark 수집은 웹 서버와 별도 프로세스로 실행합니다.
+
+### 광고 선택 중계 설정
+
+게임 인증 GET `/api/ads/decision/?slot_id=village-board`는 게임 서버에서 광고 서버의 POST `/api/media/decision/`로 중계합니다. `ADS_BASE_URL`은 광고 서버 origin이며, `ADS_MEDIA_ID`와 `ADS_MEDIA_KEY`는 광고 서버 `.env`의 같은 항목과 일치해야 합니다. 실제 매체 키는 게임 서버 `.env`에만 보관하고 접속기 설정이나 Git에 넣지 않습니다. 설정을 변경한 뒤 게임 서버를 다시 시작하세요.

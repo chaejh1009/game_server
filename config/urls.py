@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from analytics import views as analytics_views
-
+from game import ad_gateway
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,4 +27,5 @@ urlpatterns = [
     path("api/analytics/actions/", analytics_views.actions_snapshot, name="action-summary"),
     path("api/analytics/metrics/", analytics_views.metrics_snapshot),
     path("api/analytics/load/", analytics_views.load_snapshot),
+    path("api/ads/decision/", ad_gateway.decision, name="ad-decision"),
 ]

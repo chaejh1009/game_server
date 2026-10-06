@@ -18,6 +18,11 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+# 게임 서버에서만 광고 매체 키를 보관하고 광고 선택을 중계한다.
+ADS_BASE_URL = os.getenv("ADS_BASE_URL", "http://127.0.0.1:8001").rstrip("/")
+ADS_MEDIA_ID = os.getenv("ADS_MEDIA_ID", "village-game")
+ADS_MEDIA_KEY = os.getenv("ADS_MEDIA_KEY", "")
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>게임 유저 광고 확인</title>
+<body>
+  <h1>게임 유저 광고 확인</h1>
+  <form id="login">
+    <label>게임 사용자명 <input id="username" autocomplete="username" required></label>
+    <label>비밀번호 <input id="password" type="password" autocomplete="current-password" required></label>
+    <button>게임 로그인</button>
+  </form>
+  <p>이미 같은 브라우저에서 게임에 로그인했다면 바로 광고를 요청할 수 있습니다.</p>
+  <select id="slot">
+    <option value="village-board">village-board</option>
+    <option value="lobby-banner">lobby-banner</option>
+  </select>
+  <button id="load" type="button">광고 요청</button>
+  <p id="status" role="status"></p>
+  <h2 id="title"></h2>
+  <p id="body"></p>
+  <pre id="detail"></pre>
+  <script>
+    const field = id => document.getElementById(id);
+    async function csrf() {
+      const response = await fetch('/api/auth/csrf/', {credentials: 'same-origin'});
+      if (!response.ok) throw new Error(`CSRF 조회 HTTP ${response.status}`);
+      return (await response.json()).csrfToken;
+    }
+    async function post(path, payload) {
+      const token = await csrf();
+      const response = await fetch(path, {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': token},
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error(`요청 HTTP ${response.status}`);
+      return response.json();
+    }
+    field('login').addEventListener('submit', async event => {
+      event.preventDefault();
+      const password = field('password').value;
+      field('password').value = '';
+      try {
+        const result = await post('/api/auth/login/', {
+          username: field('username').value, password
+        });
+        if (!result.authenticated) throw new Error('로그인 실패');
+        await csrf();
+        field('status').textContent = '게임 로그인 완료';
+      } catch (error) { field('status').textContent = error.message; }
+    });
+    field('load').addEventListener('click', async () => {
+      field('load').disabled = true;
+      field('title').textContent = field('body').textContent = '';
+      field('detail').textContent = '';
+      try {
+        const ad = await post('/api/ads/decision/', {slot_id: field('slot').value});
+        if (ad.ad === null) { field('status').textContent = '선택할 광고 없음'; return; }
+        field('title').textContent = ad.title;
+        field('body').textContent = ad.body;
+        field('detail').textContent = JSON.stringify(ad, null, 2);
+        field('status').textContent = '선택 문구 확인 완료 · 노출 실적은 아직 기록하지 않음';
+      } catch (error) { field('status').textContent = error.message; }
+      finally { field('load').disabled = false; }
+    });
+  </script>
+</body>
+</html>
