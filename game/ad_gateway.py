@@ -31,14 +31,26 @@ def call_ads(path, payload):
     request = Request(
         settings.ADS_BASE_URL.rstrip("/") + path,
         data=json.dumps(payload, allow_nan=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", "X-Media-ID": settings.ADS_MEDIA_ID,
-                 "X-Media-Key": settings.ADS_MEDIA_KEY},
+        headers={
+            "Content-Type": "application/json",
+            "X-Media-ID": settings.ADS_MEDIA_ID,
+            "X-Media-Key": settings.ADS_MEDIA_KEY
+            },
         method="POST",
     )
     try:
         with urlopen(request, timeout=3) as response:
             return response.status, json.load(response)
     except HTTPError as exc:
+        try:
+            body = json.loads(exc.read(65536))
+            error = body.get("error", "") if isinstance(body, dict) else ""
+            code = error.split(":", 1)[0] if isinstance(error, str) else ""
+            if code in {"decision_snapshot_missing", "decision_not_found_for_subject",
+                        "impression_required", "decision_id_required", "event_type_invalid"}:
+                return exc.code, {"error": code}
+        except (ValueError, UnicodeDecodeError, OSError):
+            pass
         return exc.code, {"error": "ad_request_rejected"}
     except (URLError, TimeoutError, ValueError):
         return 503, {"error": "ads_unavailable"}
@@ -130,3 +142,47 @@ def request_decision(player, slot_id):
         ValueError, KeyError, TypeError,
     ) as error:
         raise AdsUnavailable("ads_unavailable") from error
+
+def request_ad_event(player, decision_id, event_type):
+    """Use the logged-in player's identity; clients supply only the event target."""
+    if not settings.ADS_MEDIA_KEY:
+        raise AdsUnavailable("media_key_missing")
+    if (not isinstance(decision_id, str) or not decision_id
+            or len(decision_id) > 128 or event_type not in ("impression", "click")):
+        raise ValueError("invalid_ad_event")
+    # [문제 1 · 여러 줄] 매체·로그인 Player·결정·종류를 payload에 구성한다. (9줄)
+    # 예시: packet = {"device": {"id": str(device.pk)}, "action": action}
+    payload = {
+        "media_id": settings.ADS_MEDIA_ID,
+        "subject": {
+            "media_id": settings.ADS_MEDIA_ID,
+            "subject_id": str(player.pk),
+        },
+        "decision_id": decision_id,
+        "event_type": event_type,
+    }
+
+    # [문제 2 · 한 줄] events API를 호출하고 두 반환값을 status, data로 받는다.
+    # 예시: status, data = send_message("/api/messages/", packet)
+    status, data = call_ads("/api/media/events/", payload)
+
+    if status == 503:
+        raise AdsUnavailable("ads_unavailable")
+    # [문제 3 · 여러 줄] 거절 응답과 잘못된 성공 응답을 구별한다. (10줄)
+    # 예시: if status != 200:
+    #           raise ValueError("message_rejected")
+    #       if not isinstance(data, dict) or data.get("id") != message_id:
+    #           raise ServiceUnavailable("invalid_response")
+
+    if status != 200:
+        code = data.get("error") if isinstance(data, dict) else None
+        allowed = {"decision_snapshot_missing", "decision_not_found_for_subject",
+                "impression_required", "decision_id_required", "event_type_invalid"}
+        raise ValueError(code if code in allowed else "ad_event_rejected")
+    if (not isinstance(data, dict)
+            or data.get("event_id") != decision_id + ":" + event_type
+            or data.get("event_type") != event_type
+            or type(data.get("created")) is not bool):
+        raise AdsUnavailable("invalid_ad_event_response")
+
+    return {name: data[name] for name in ("event_id", "event_type", "created")}

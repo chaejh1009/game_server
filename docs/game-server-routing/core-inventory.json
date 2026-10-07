@@ -1,0 +1,428 @@
+{
+  "manage.py": {
+    "main": {
+      "kind": "function",
+      "signature": "def main()",
+      "line": 7
+    }
+  },
+  "config/asgi.py": {},
+  "config/settings.py": {},
+  "config/urls.py": {},
+  "config/wsgi.py": {},
+  "game/ad_events.py": {
+    "ad_event": {
+      "kind": "function",
+      "signature": "def ad_event(request)",
+      "line": 12
+    }
+  },
+  "game/ad_gateway.py": {
+    "media_payload": {
+      "kind": "function",
+      "signature": "def media_payload(user)",
+      "line": 16
+    },
+    "call_ads": {
+      "kind": "function",
+      "signature": "def call_ads(path, payload)",
+      "line": 30
+    },
+    "viewer_methods": {
+      "kind": "function",
+      "signature": "def viewer_methods(*allowed)",
+      "line": 60
+    },
+    "decision": {
+      "kind": "function",
+      "signature": "def decision(request)",
+      "line": 81
+    },
+    "AdsUnavailable": {
+      "kind": "class",
+      "signature": "class AdsUnavailable(Exception)",
+      "line": 89
+    },
+    "request_decision": {
+      "kind": "function",
+      "signature": "def request_decision(player, slot_id)",
+      "line": 93
+    },
+    "request_ad_event": {
+      "kind": "function",
+      "signature": "def request_ad_event(player, decision_id, event_type)",
+      "line": 146
+    }
+  },
+  "game/admin.py": {},
+  "game/apps.py": {
+    "GameConfig": {
+      "kind": "class",
+      "signature": "class GameConfig(AppConfig)",
+      "line": 4
+    }
+  },
+  "game/consumers.py": {
+    "read_player": {
+      "kind": "function",
+      "signature": "def read_player(user_id)",
+      "line": 8
+    },
+    "read_room": {
+      "kind": "function",
+      "signature": "def read_room(room_id, player_ids)",
+      "line": 16
+    },
+    "PlayConsumer": {
+      "kind": "class",
+      "signature": "class PlayConsumer(AsyncJsonWebsocketConsumer)",
+      "line": 20
+    },
+    "PlayConsumer.connect": {
+      "kind": "function",
+      "signature": "async def connect(self)",
+      "line": 21
+    },
+    "PlayConsumer.room_snapshot": {
+      "kind": "function",
+      "signature": "async def room_snapshot(self, event)",
+      "line": 43
+    },
+    "PlayConsumer.room_state": {
+      "kind": "function",
+      "signature": "async def room_state(self, event)",
+      "line": 47
+    },
+    "PlayConsumer.receive_json": {
+      "kind": "function",
+      "signature": "async def receive_json(self, content, **kwargs)",
+      "line": 50
+    },
+    "PlayConsumer.disconnect": {
+      "kind": "function",
+      "signature": "async def disconnect(self, close_code)",
+      "line": 69
+    }
+  },
+  "game/models.py": {
+    "Player": {
+      "kind": "class",
+      "signature": "class Player(models.Model)",
+      "line": 7
+    },
+    "Player.__str__": {
+      "kind": "function",
+      "signature": "def __str__(self)",
+      "line": 16
+    },
+    "GameEvent": {
+      "kind": "class",
+      "signature": "class GameEvent(models.Model)",
+      "line": 19
+    },
+    "GameEvent.Meta": {
+      "kind": "class",
+      "signature": "class Meta",
+      "line": 28
+    }
+  },
+  "game/routing.py": {},
+  "game/services.py": {
+    "observe_player": {
+      "kind": "function",
+      "signature": "def observe_player(player)",
+      "line": 13
+    },
+    "next_transition_position": {
+      "kind": "function",
+      "signature": "def next_transition_position(player)",
+      "line": 20
+    },
+    "serialize_player": {
+      "kind": "function",
+      "signature": "def serialize_player(player)",
+      "line": 32
+    },
+    "serialize_event": {
+      "kind": "function",
+      "signature": "def serialize_event(event)",
+      "line": 43
+    },
+    "apply_command": {
+      "kind": "function",
+      "signature": "def apply_command(user_id, command)",
+      "line": 56
+    }
+  },
+  "game/transforms.py": {
+    "parse_game_event": {
+      "kind": "function",
+      "signature": "def parse_game_event(raw_value)",
+      "line": 22
+    },
+    "is_game_action": {
+      "kind": "function",
+      "signature": "def is_game_action(event)",
+      "line": 49
+    },
+    "with_action_label": {
+      "kind": "function",
+      "signature": "def with_action_label(event)",
+      "line": 52
+    }
+  },
+  "game/urls.py": {},
+  "game/views.py": {
+    "player_view": {
+      "kind": "function",
+      "signature": "def player_view(request)",
+      "line": 15
+    },
+    "play": {
+      "kind": "function",
+      "signature": "def play(request)",
+      "line": 22
+    },
+    "delivery_view": {
+      "kind": "function",
+      "signature": "def delivery_view(request)",
+      "line": 26
+    },
+    "history": {
+      "kind": "function",
+      "signature": "def history(request)",
+      "line": 43
+    },
+    "csrf_view": {
+      "kind": "function",
+      "signature": "def csrf_view(request)",
+      "line": 55
+    },
+    "api_login": {
+      "kind": "function",
+      "signature": "def api_login(request)",
+      "line": 62
+    },
+    "ad_preview": {
+      "kind": "function",
+      "signature": "def ad_preview(request)",
+      "line": 97
+    },
+    "ad_decision": {
+      "kind": "function",
+      "signature": "def ad_decision(request)",
+      "line": 102
+    }
+  },
+  "game/management/commands/consume_game_sample.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 11
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 14
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 20
+    }
+  },
+  "game/management/commands/create_player.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 10
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 13
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 18
+    }
+  },
+  "game/management/commands/export_event_sample.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 7
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 9
+    }
+  },
+  "game/management/commands/export_game_events.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 7
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 9
+    }
+  },
+  "game/management/commands/export_game_handoff.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 10
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 13
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 18
+    }
+  },
+  "game/management/commands/inspect_game_facts.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 5
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 8
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 11
+    }
+  },
+  "game/management/commands/inspect_game_offsets.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 8
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 11
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 15
+    }
+  },
+  "game/management/commands/prepare_load_players.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 12
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 15
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 21
+    }
+  },
+  "game/management/commands/publish_game_events.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 10
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 12
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 16
+    }
+  },
+  "game/management/commands/replay_game_events.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 10
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 13
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 18
+    }
+  },
+  "game/management/commands/snapshot_game_actions.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 10
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 13
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 18
+    }
+  },
+  "game/management/commands/transform_game_actions.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 9
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 12
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 17
+    }
+  },
+  "game/management/commands/watch_game_events.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 6
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 8
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 12
+    }
+  }
+}

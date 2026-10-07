@@ -2,9 +2,12 @@
 
 Django와 Channels로 구성한 수업용 게임 서버입니다. 세션 인증을 거친 WebSocket 명령으로 이동·채집·수련을 처리하고, 플레이어 상태와 확정 이벤트를 MySQL에 함께 저장합니다. 이벤트는 Kafka의 원본·행동 토픽을 거쳐 Spark 배치 집계, Parquet 수집, 시간 창 집계에 사용합니다.
 
+코드 탐색은 [라우팅 문서](docs/game-server-routing/README.md)에서 시작합니다. HTTP·WebSocket 경로와 파일별 함수 서명·호출 흐름을 정리했습니다.
+
 ## 현재 구현 상태
 
 - 로그인·로그아웃, 내 상태·최근 이벤트·미발행 이벤트 수 조회
+- 로그인 Player 기반 광고 선택 및 impression·click 이벤트 중계
 - WebSocket 초기 상태, 같은 방의 접속자 목록과 상태 변경 방송
 - 플레이어 행 잠금과 트랜잭션을 통한 상태 변경 및 `GameEvent` 기록
 - 플레이어별 `command_id` 중복 처리 방지, 연결별 0.2초 명령 간격 제한
@@ -117,6 +120,11 @@ Daphne가 개발 서버를 제공하며 HTTP와 WebSocket을 함께 처리합니
 | `/api/analytics/` | GET | `../data/marts/game-summary.json` 조회 |
 | `/api/analytics/actions/` | GET | `../data-replay/actions/`의 행동 스냅샷 manifest와 집계 조회 |
 | `/api/analytics/ingest/` | GET | `../data/marts/stream-summary.json` 조회 |
+| `/api/auth/csrf/` | GET | CSRF 토큰과 쿠키 발급, 로그인 불필요 |
+| `/api/auth/login/` | POST | JSON 로그인, CSRF 필요 |
+| `/ads-preview/` | GET | 광고 확인 화면, 로그인 불필요 |
+| `/api/ads/decision/` | POST | 로그인 Player의 광고 선택, CSRF 필요 |
+| `/api/ads/events/` | POST | 선택된 광고의 impression·click 접수 중계, CSRF 필요 |
 | `/admin/` | HTTP | Django 관리자 사이트, 관리자 계정 별도 필요 |
 
 게임·분석 조회에는 로그인이 필요합니다. 미인증 요청은 `/api/player/`, `/api/delivery/`, `/api/analytics/`, `/api/analytics/ingest/`에서 HTTP 401 JSON을 반환하며, `/play/`, `/api/history/`, `/api/analytics/actions/`에서는 로그인 화면으로 이동합니다.
@@ -374,7 +382,9 @@ game_server/
     services.py                 게임 명령, transition 기록, 이벤트 직렬화
     consumers.py                WebSocket 인증, 접속 관리, 방별 방송
     transforms.py               이벤트 검증 및 행동 표시 이름 부여
-    views.py                    준비 화면, 상태·발행 현황·이력 API
+    views.py                    준비 화면, 상태·발행 현황·이력·광고 선택 API
+    ad_events.py                인증된 광고 impression·click 이벤트 API
+    ad_gateway.py               Player subject 구성, 광고 서버 HTTP 중계
     management/commands/        플레이어 생성, Kafka 처리, 내보내기
     templates/                  로그인·준비 화면
     migrations/                 DB 마이그레이션
@@ -386,6 +396,7 @@ game_server/
     test_ingest_views.py        수집 집계 API 테스트
   spark_jobs/                   배치 집계, Parquet 수집, 수집 집계, 시간 창
   tools/                        JSONL 검사, transition 추출, 이벤트 비교
+  docs/game-server-routing/     경로·호출 흐름·파일별 Python 라우팅 문서
   manage.py                     Django 관리 명령
   requirements.txt              Python 의존성
 data/                           기본 입력·출력·checkpoint (상위 디렉터리)
@@ -399,10 +410,21 @@ python manage.py check
 python manage.py test
 ```
 
-현재 테스트는 `game/test_transforms.py` 4건, `analytics/test_ingest_views.py` 3건과 `game/test_ad_gateway.py` 4건입니다. 광고 중계 테스트는 설정 로딩, 인증된 선택의 서버 간 payload·키 전달, 미인증 차단, 광고 서버 장애의 503 응답을 검증합니다. 행동 선별·원본 보존, 수집 집계 API의 인증·미생성·정상 조회를 검증하며 DB를 사용하지 않습니다. `game/tests.py`와 `analytics/tests.py`는 기본 골격만 있습니다. 게임 DB 갱신, WebSocket, Kafka, Spark를 연결한 통합 테스트는 포함하지 않습니다. `check`도 DB 연결이나 외부 서비스의 동작을 확인하지 않습니다.
+현재 테스트는 `game/test_transforms.py` 4건, `analytics/test_ingest_views.py` 3건과 `game/test_ad_gateway.py` 4건입니다. 광고 중계 테스트는 gateway의 GET 뷰를 직접 호출하여 설정 로딩, 서버 간 payload·키 전달, 미인증 차단, 광고 서버 장애의 503 응답을 검증합니다. 실제 URL resolver의 POST 선택 경로와 새 광고 이벤트 API는 이 4건의 테스트 범위에 포함되지 않습니다. 행동 선별·원본 보존, 수집 집계 API의 인증·미생성·정상 조회를 검증하며 DB를 사용하지 않습니다. `game/tests.py`와 `analytics/tests.py`는 기본 골격만 있습니다. 게임 DB 갱신, WebSocket, Kafka, Spark를 연결한 통합 테스트는 포함하지 않습니다. `check`도 DB 연결이나 외부 서비스의 동작을 확인하지 않습니다.
 
 현재 설정은 로컬 수업·개발용입니다. `DEBUG=True`, 전체 호스트 허용, 코드에 고정된 `SECRET_KEY`, 메모리 기반 채널 레이어와 접속자 사전을 사용합니다. 여러 서버 프로세스에서 운영하려면 채널 레이어와 접속자 관리를 공유해야 합니다. Kafka 발행·변환과 Spark 수집은 웹 서버와 별도 프로세스로 실행합니다.
 
-### 광고 선택 중계 설정
+### 광고 선택·이벤트 중계
 
-게임 인증 GET `/api/ads/decision/?slot_id=village-board`는 게임 서버에서 광고 서버의 POST `/api/media/decision/`로 중계합니다. `ADS_BASE_URL`은 광고 서버 origin이며, `ADS_MEDIA_ID`와 `ADS_MEDIA_KEY`는 광고 서버 `.env`의 같은 항목과 일치해야 합니다. 실제 매체 키는 게임 서버 `.env`에만 보관하고 접속기 설정이나 Git에 넣지 않습니다. 설정을 변경한 뒤 게임 서버를 다시 시작하세요.
+로그인 세션과 CSRF 토큰을 포함한 POST `/api/ads/decision/`에 `{"slot_id":"village-board"}`를 보내면 광고 서버의 POST `/api/media/decision/`로 중계합니다. 허용 slot은 `village-board`, `lobby-banner`입니다. `config.urls`의 GET용 gateway 경로는 앞선 `game.urls`에 가려져 있으므로 GET `/api/ads/decision/`는405를 반환합니다. `ADS_BASE_URL`은 광고 서버 origin이며, `ADS_MEDIA_ID`와 `ADS_MEDIA_KEY`는 광고 서버 `.env`의 같은 항목과 일치해야 합니다. 실제 매체 키는 게임 서버 `.env`에만 보관하고 접속기 설정이나 Git에 넣지 않습니다. 설정을 변경한 뒤 게임 서버를 다시 시작하세요.
+
+
+선택 응답의 `decision_id`로 POST `/api/ads/events/`를 호출합니다. reverse 이름은 `game:ad-events`이며 입력 키는 다음 두 개만 허용합니다.
+
+```json
+{"decision_id":"선택 응답의 decision_id","event_type":"impression"}
+```
+
+`event_type`은 `impression` 또는 `click`입니다. 실제 노출·클릭 시점에 클라이언트가 전송하며, 게임 서버는 광고 선택이나 이미지 다운로드만으로 노출 이벤트를 만들지 않습니다. subject는 로그인 Player의 PK로 서버에서 구성하므로 클라이언트가 subject·media_id·campaign_id를 보내면400으로 거부합니다. decision_id는 비어 있지 않은128자 이하 문자열로 검사합니다.
+
+성공 응답은 `event_id`, `event_type`, `created`이며 `Cache-Control: no-store`를 포함합니다. `created: false`도 중복 접수에 대한200 정상 응답입니다. 뷰의 오류는 입력·업무 거절400, 미로그인401, Player 없음409, 광고 서버 장애·응답 검증 실패503입니다. POST 이외는405이며 CSRF middleware에서 먼저403으로 거부할 수도 있습니다. 허용된 업무 오류 코드와 상세 호출 경계는 [광고 이벤트 문서](docs/game-server-routing/files/game/ad_events.py.md)와 [gateway 문서](docs/game-server-routing/files/game/ad_gateway.py.md)를 참고하세요.
