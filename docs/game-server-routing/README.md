@@ -4,7 +4,7 @@
 
 ## 범위
 
-직접 유지보수하는 런타임 Python **85파일·139개 클래스/함수/메서드**를 다룬다. 각 파일은 `files/<프로젝트 상대경로>.md` 하나에 대응한다. `manage.py`, `config`, `game`, `analytics`, `spark_jobs`, `tools`를 포함한다.
+직접 유지보수하는 런타임 Python **86파일·142개 클래스/함수/메서드**를 다룬다. 각 파일은 `files/<프로젝트 상대경로>.md` 하나에 대응한다. `manage.py`, `config`, `game`, `analytics`, `spark_jobs`, `tools`를 포함한다.
 
 테스트(`tests.py`, `test_*.py`), migrations, 빈 `__init__.py`, 교시별 독립 연습인 `tools/basics/**`, 가상환경·캐시·DB·데이터 산출물·`.env`는 제외한다. 템플릿·정적 파일은 소비하는 view의 문서에서 참조한다. 설정은 변수명과 경로 해석 규칙으로 설명하고 비밀값은 기록하지 않는다.
 
@@ -21,7 +21,7 @@ config.asgi.application
     -> game.services.apply_command -> DB -> 방 state/snapshot broadcast
 config.wsgi.application -> Django HTTP 처리
 
-game 관리 명령 -> DB export / Kafka outbox 발행 / 사실→행동 변환 / 고정 범위 snapshot
+game 관리 명령 -> DB export / Player 공개 상태 NDJSON / Kafka outbox 발행 / 사실→행동 변환 / 고정 범위 snapshot
 analytics 관리 명령 -> spark-submit -> spark_jobs -> Parquet/Delta/창 결과 -> 게시 JSON
 tools -> 표본 검증 / Bronze 보존·사본 / 전이 인계 / 실제 WS 부하 측정
 ```

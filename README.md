@@ -13,6 +13,7 @@ Django와 Channels로 구성한 수업용 게임 서버입니다. 세션 인증�
 - 플레이어별 `command_id` 중복 처리 방지, 연결별 0.2초 명령 간격 제한
 - 이동·채집·수련 이벤트에 행동 전후 관측과 보상을 담은 `transition` 기록
 - MySQL outbox 발행, Kafka 관찰·offset 조회·고정 구간 재읽기
+- Player 공개 상태의 NDJSON 스냅샷 내보내기 및 행 수·SHA-256 확인
 - 행동 이벤트 필터링과 표시 이름 추가, 행동 토픽 스냅샷 및 집계 API
 - Spark JSONL 배치 집계, Kafka → Parquet 수집, 수집 품질·중복 집계, 시간 창 집계
 - 수동 행동 데이터를 JSONL로 내보내고 5단계 episode의 연결을 검사하는 도구
@@ -262,6 +263,27 @@ consumer group은 `village-actions-v1`로 제한됩니다. 출력 ack 이후 입
 `--max-events N`은 입력 처리 건수를 제한합니다. 기본값 0은 계속 실행합니다. 지정 건수에 도달할 때까지 새 이벤트를 기다리므로 중단할 때는 `Ctrl+C`를 사용합니다.
 
 발행·변환은 DB와 Kafka 또는 입력·출력 처리를 각각 확정하므로 ack 직후 중단·재시작 시 같은 `event_id`가 중복 전달될 수 있습니다. 후속 배치·수집 집계는 `event_id` 기준으로 중복을 제거합니다.
+
+## 플레이어 공개 상태 내보내기
+
+MySQL의 현재 Player 공개 상태를 파일로 저장합니다. 실행에 Django 설정과 DB 연결이 필요합니다.
+
+```bash
+python manage.py export_player_snapshot --output ../data/snapshots/players.ndjson
+```
+
+`--output`은 필수이며 부모 디렉터리는 자동으로 생성합니다. ID 순서로 한 줄에 JSON 객체 하나를 UTF-8로 기록합니다. 각 행의 필드는 다음과 같습니다.
+
+| 필드 | 내용 |
+| --- | --- |
+| `schema_version`, `source_kind` | `"player-snapshot/v1"`, `"player-snapshot"` |
+| `captured_at` | 실행 초기에 얻은 공통 수집 시각, 시간대 포함 ISO 문자열 |
+| `id`, `room_id`, `coins`, `version` | Player의 ID·방·코인·상태 버전 |
+| `updated_at` | Player 수정 시각, 시간대 포함 ISO 문자열 |
+
+성공하면 stdout에 `path`, `rows`, `sha256`, `schema_version`, `source_kind`, `captured_at`을 담은 JSON을 출력합니다. SHA-256은 출력 파일 전체 바이트를 기준으로 계산합니다. Player가 없으면 빈 파일을 만들고 `rows: 0`, `captured_at: null`을 출력합니다. 별도 manifest 파일은 만들지 않습니다.
+
+대상과 같은 디렉터리에 임시 파일을 완성한 뒤 기존 출력 파일을 교체하므로 재실행하면 같은 경로를 덮어씁니다. 조회 전체를 고정하는 별도 트랜잭션은 사용하지 않아 실행 중 변경된 상태가 섞일 수 있습니다. 상세 함수와 오류 처리는 [내보내기 라우팅 문서](docs/game-server-routing/files/game/management/commands/export_player_snapshot.py.md)를 참고하세요.
 
 ## Spark 집계와 수집
 

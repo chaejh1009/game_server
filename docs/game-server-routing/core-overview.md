@@ -143,6 +143,20 @@ subject는 조회 번호나 문자열 하나가 아니라 `{media_id,subject_id}
 
 사실→행동 변환 함수는 [game/transforms.py](files/game/transforms.py.md)에 있다. parse_game_event는 bytes/필수필드/schema/UUID/정수 player/timezone을 검사한다. is_game_action은 세 event_type만 고르고, with_action_label은 deepcopy한 payload에 한국어 이름을 붙여 원본 event_id/key/player_id를 유지한다.
 
+### Player 공개 상태 내보내기 호출 흐름
+
+```text
+manage.py export_player_snapshot --output <경로>
+  -> Command.add_arguments: 필수 출력 경로 등록
+  -> Command.handle: 부모 디렉터리 생성·공통 captured_at 확보
+    -> Player.objects.order_by("id").values(...).iterator()
+    -> updated_at 시간대 검사·NDJSON 임시 파일 작성
+    -> 완성 파일 SHA-256 계산 -> os.replace로 대상 교체
+    -> stdout에 경로·행 수·체크섬·스키마·수집 시각 JSON 출력
+```
+
+기존 대상은 성공 시 교체하며 별도 manifest를 만들지 않는다. Player가 없으면 빈 파일을 게시하고 stdout의 captured_at은 null이다. 조회 전체를 고정하는 별도 transaction이 없어 captured_at이 DB 전체의 일관된 시점을 보장하지 않는다. 출력 필드와 예외 처리 범위는 [파일별 문서](files/game/management/commands/export_player_snapshot.py.md), 실행 예시는 [프로젝트 README](../../README.md#플레이어-공개-상태-내보내기)를 따른다.
+
 ## 파일별 상세 문서
 
 | 영역 | 문서 |

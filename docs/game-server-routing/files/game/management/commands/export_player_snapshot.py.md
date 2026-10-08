@@ -10,6 +10,8 @@ Player의 공개 상태를 ID 순서로 읽어 `player-snapshot/v1` NDJSON 파�
 
 성공 시 stdout에 `path`, `rows`, `sha256`, `schema_version`, `source_kind`, `captured_at`을 JSON으로 출력한다. 빈 조회 결과는 빈 파일을 만들며 stdout의 captured_at은 null이다. sha256은 완성된 파일 바이트의 SHA-256이다.
 
+기존 출력 파일은 성공 시 교체되며 별도 manifest는 생성하지 않는다. NDJSON은 UTF-8이며 각 JSON 객체 뒤에 LF를 기록한다. 전체 조회를 고정하는 별도 트랜잭션이 없으므로 공통 captured_at이 모든 행의 동일한 DB 조회 시점을 보장하지 않는다.
+
 ## 연결
 
 [game/models.py](../../models.py.md) · [manage.py](../../../manage.py.md)
