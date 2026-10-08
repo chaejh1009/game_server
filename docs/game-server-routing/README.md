@@ -109,6 +109,7 @@ tools -> 표본 검증 / Bronze 보존·사본 / 전이 인계 / 실제 WS 부�
 | `game/management/commands/export_event_sample.py` | [문서](files/game/management/commands/export_event_sample.py.md) | 가장 최근 확정 GameEvent 한 건을 학습용 JSON 파일로 저장한다. |
 | `game/management/commands/export_game_events.py` | [문서](files/game/management/commands/export_game_events.py.md) | 확정 MySQL GameEvent 전체를 Spark용 JSONL snapshot으로 내보낸다. |
 | `game/management/commands/export_game_handoff.py` | [문서](files/game/management/commands/export_game_handoff.py.md) | 외부 분석 단계로 넘길 확정 GameEvent JSONL을 선택 시간 구간으로 내보낸다. |
+| `game/management/commands/export_player_snapshot.py` | [문서](files/game/management/commands/export_player_snapshot.py.md) | Player 공개 상태를 player-snapshot/v1 NDJSON으로 내보내고 행 수·SHA-256을 출력한다. 임시 파일 완성 후 대상을 교체한다. |
 | `game/management/commands/inspect_game_facts.py` | [문서](files/game/management/commands/inspect_game_facts.py.md) | 확정 MySQL 사실의 공개 식별자와 Outbox 발행 상태를 제한된 행 수로 조회한다. |
 | `game/management/commands/inspect_game_offsets.py` | [문서](files/game/management/commands/inspect_game_offsets.py.md) | 레코드를 소비하거나 commit하지 않고 topic/group의 partition별 보존 시작·끝·저장 위치를 조회한다. |
 | `game/management/commands/prepare_load_players.py` | [문서](files/game/management/commands/prepare_load_players.py.md) | 부하 테스트 계정 묶음을 만들고 공개 account manifest를 내보낸다. 기존 비밀번호를 덮어쓰지 않는다. |

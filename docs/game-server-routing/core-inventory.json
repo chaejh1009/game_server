@@ -424,5 +424,22 @@
       "signature": "def handle(self, *args, **options)",
       "line": 12
     }
+  },
+  "game/management/commands/export_player_snapshot.py": {
+    "Command": {
+      "kind": "class",
+      "signature": "class Command(BaseCommand)",
+      "line": 13
+    },
+    "Command.add_arguments": {
+      "kind": "function",
+      "signature": "def add_arguments(self, parser)",
+      "line": 16
+    },
+    "Command.handle": {
+      "kind": "function",
+      "signature": "def handle(self, *args, **options)",
+      "line": 19
+    }
   }
 }

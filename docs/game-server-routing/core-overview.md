@@ -2,7 +2,7 @@
 
 [전체 라우팅 목차](README.md)
 
-이 문서는 2026-10-07 현재 `manage.py`, `config/*.py`, `game/*.py`, `game/management/commands/*.py`의 실제 소스를 기준으로 작성했다. top-level 함수·클래스·메서드는 스킬의 AST inventory로 추출했다. 교안 overlay나 계획된 기능을 현재 구현으로 간주하지 않았다. 원본 Python 파일과 .env는 변경하지 않았고 .env는 읽지 않았다.
+이 문서는 2026-10-08 현재 `manage.py`, `config/*.py`, `game/*.py`, `game/management/commands/*.py`의 실제 소스를 기준으로 작성했다. top-level 함수·클래스·메서드는 스킬의 AST inventory로 추출했다. 교안 overlay나 계획된 기능을 현재 구현으로 간주하지 않았다. 원본 Python 파일과 .env는 변경하지 않았고 .env는 읽지 않았다.
 
 ## 진입점과 소유 경계
 
@@ -132,6 +132,7 @@ subject는 조회 번호나 문자열 하나가 아니라 `{media_id,subject_id}
 | [export_event_sample](files/game/management/commands/export_event_sample.py.md) | MySQL 최신1행 → sample JSON | samples/game-event.json 직접 덮어쓰기 |
 | [export_game_events](files/game/management/commands/export_game_events.py.md) | MySQL 전체 → raw JSONL | 임시파일 완성 후 교체; published_at 변경 없음 |
 | [export_game_handoff](files/game/management/commands/export_game_handoff.py.md) | MySQL [since,until) → 지정 JSONL | timezone 필수, UTC event_time, 임시파일 교체 |
+| [export_player_snapshot](files/game/management/commands/export_player_snapshot.py.md) | Player 공개 상태 → 지정 NDJSON·stdout 메타데이터 | 시간대 검사, 임시 파일 교체, 행 수·SHA-256; DB 변경 없음 |
 | [publish_game_events](files/game/management/commands/publish_game_events.py.md) | 미발행 Outbox → Kafka·published_at | ack 뒤 발행 시각; 재전송 가능 |
 | [watch_game_events](files/game/management/commands/watch_game_events.py.md) | Kafka → stdout·group offset | 관찰 group에서 처리 batch 뒤 수동 commit |
 | [consume_game_sample](files/game/management/commands/consume_game_sample.py.md) | Kafka → append JSONL·group offset | write/flush/fsync 뒤 offset+1 commit |
@@ -152,11 +153,11 @@ subject는 조회 번호나 문자열 하나가 아니라 `{media_id,subject_id}
 | HTTP·WS | [game/urls.py](files/game/urls.py.md), [game/views.py](files/game/views.py.md), [game/routing.py](files/game/routing.py.md), [game/consumers.py](files/game/consumers.py.md) |
 | 광고 bridge | [game/ad_gateway.py](files/game/ad_gateway.py.md), [game/ad_events.py](files/game/ad_events.py.md) |
 | 앱 등록 | [game/apps.py](files/game/apps.py.md), [game/admin.py](files/game/admin.py.md) |
-| 관리 명령 | 위13개 명령 문서 |
+| 관리 명령 | 위14개 명령 문서 |
 
 ## 범위와 제외 목록
 
-CORE 문서는29개 Python 파일·75개 AST 기호를 포함한다. 설정/URL/admin처럼 기호가0개인 파일도 모듈 등록 값과 순서를 문서화했다. 함수 안의 decorator closure는 top-level inventory에 포함하지 않지만 viewer_methods의 실행 흐름에서 설명했다.
+CORE 문서는30개 Python 파일·78개 AST 기호를 포함한다. 설정/URL/admin처럼 기호가0개인 파일도 모듈 등록 값과 순서를 문서화했다. 함수 안의 decorator closure는 top-level inventory에 포함하지 않지만 viewer_methods의 실행 흐름에서 설명했다.
 
 제외한 테스트: `game/tests.py`, `game/test_ad_gateway.py`, `game/test_transforms.py`. 제외한 migration: `game/migrations/0001_initial.py`, `game/migrations/__init__.py` 및 migrations 하위 전체. 제외한 빈 패키지 파일: `config/__init__.py`, `game/__init__.py`. analytics·spark·tools는 [전체 라우팅 목차](README.md)와 [분석 흐름 문서](analytics-overview.md)에 연결되어 있다. template/static/설정 환경값/DB 실제 데이터와 실행 중 서버 상태는 이 Python routing inventory의 대상이 아니다.
 
