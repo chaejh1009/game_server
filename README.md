@@ -4,6 +4,8 @@ Django와 Channels로 구성한 수업용 게임 서버입니다. 세션 인증�
 
 코드 탐색은 [라우팅 문서](docs/game-server-routing/README.md)에서 시작합니다. HTTP·WebSocket 경로와 파일별 함수 서명·호출 흐름을 정리했습니다.
 
+[전체 AST 목록](docs/game-server-routing/routing-inventory.json)은 런타임 Python 86파일·142개 클래스/함수/메서드의 서명과 정의 줄을 담습니다. 문서 갱신 규칙과 최근 정적 점검 결과는 라우팅 목차에서 확인할 수 있습니다.
+
 ## 현재 구현 상태
 
 - 로그인·로그아웃, 내 상태·최근 이벤트·미발행 이벤트 수 조회
@@ -121,6 +123,9 @@ Daphne가 개발 서버를 제공하며 HTTP와 WebSocket을 함께 처리합니
 | `/api/analytics/` | GET | `../data/marts/game-summary.json` 조회 |
 | `/api/analytics/actions/` | GET | `../data-replay/actions/`의 행동 스냅샷 manifest와 집계 조회 |
 | `/api/analytics/ingest/` | GET | `../data/marts/stream-summary.json` 조회 |
+| `/api/analytics/windows/` | GET | `../data/marts/windows.json`의 확정 시간 창 조회 |
+| `/api/analytics/metrics/` | GET | `../data/marts/game-metrics.json`의 전달 측정 snapshot 조회 |
+| `/api/analytics/load/` | GET | `../data/load/run-50.json`의 허용 측정값과 방별 집계 조회 |
 | `/api/auth/csrf/` | GET | CSRF 토큰과 쿠키 발급, 로그인 불필요 |
 | `/api/auth/login/` | POST | JSON 로그인, CSRF 필요 |
 | `/ads-preview/` | GET | 광고 확인 화면, 로그인 불필요 |
@@ -128,9 +133,11 @@ Daphne가 개발 서버를 제공하며 HTTP와 WebSocket을 함께 처리합니
 | `/api/ads/events/` | POST | 선택된 광고의 impression·click 접수 중계, CSRF 필요 |
 | `/admin/` | HTTP | Django 관리자 사이트, 관리자 계정 별도 필요 |
 
-게임·분석 조회에는 로그인이 필요합니다. 미인증 요청은 `/api/player/`, `/api/delivery/`, `/api/analytics/`, `/api/analytics/ingest/`에서 HTTP 401 JSON을 반환하며, `/play/`, `/api/history/`, `/api/analytics/actions/`에서는 로그인 화면으로 이동합니다.
+게임·분석 조회에는 로그인이 필요합니다. 미인증 요청은 `/api/player/`, `/api/delivery/`, `/api/analytics/`, `/api/analytics/ingest/`, `/api/analytics/windows/`에서 HTTP 401 JSON을 반환하며, `/play/`, `/api/history/`, `/api/analytics/actions/`, `/api/analytics/metrics/`, `/api/analytics/load/`에서는 로그인 화면으로 이동합니다. 위 표는 조회에 사용하는 GET을 안내합니다. `/play/`, `/api/history/`, `/api/analytics/actions/`, `/api/analytics/metrics/`, `/api/analytics/load/`의 뷰에는 별도 HTTP 메서드 제한이 없습니다.
 
 분석 API는 파일에 저장된 전체 집계 결과를 읽습니다. 플레이어나 방별로 응답을 제한하지 않으며, 조회 요청이 Spark 작업을 실행하지도 않습니다. 집계 파일이 아직 없으면 `available: false`를 반환합니다. 수집 집계 파일을 읽거나 검증할 수 없으면 `/api/analytics/ingest/`는 HTTP 503과 `ingest_summary_unreadable`을 반환합니다.
+
+부하 측정 API는 개별 플레이어 목록을 반환하지 않고 방별 연결 성공 수와 명령 성공 수로 집계합니다. 분석 파일 경로와 각 핸들러의 반환·오류 계약은 [분석 라우팅 문서](docs/game-server-routing/analytics-overview.md)를 참고하세요.
 
 ## WebSocket 명령과 방송
 
