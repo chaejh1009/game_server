@@ -2,7 +2,7 @@
 
 [전체 라우팅 목차](README.md)
 
-이 문서는 2026-10-08 현재 `manage.py`, `config/*.py`, `game/*.py`, `game/management/commands/*.py`의 실제 소스를 기준으로 작성했다. top-level 함수·클래스·메서드는 스킬의 AST inventory로 추출했다. 교안 overlay나 계획된 기능을 현재 구현으로 간주하지 않았다. 원본 Python 파일과 .env는 변경하지 않았고 .env는 읽지 않았다.
+이 문서는 2026-10-13 현재 `manage.py`, `config/*.py`, `game/*.py`, `game/management/commands/*.py`의 실제 소스를 기준으로 작성했다. top-level 함수·클래스·메서드는 스킬의 AST inventory로 추출했다. 교안 overlay나 계획된 기능을 현재 구현으로 간주하지 않았다. 문서 대조는 AST와 Git diff를 사용하며 설정의 비밀값을 기록하지 않는다.
 
 ## 진입점과 소유 경계
 
@@ -31,6 +31,7 @@
 | `/ads-preview/` | views.ad_preview | GET, 로그인 불필요 | 광고 확인 HTML |
 | `/api/ads/decision/` | views.ad_decision | POST JSON·session·CSRF | 선택 또는 빈 광고 dict; 오류400/401/404/503 |
 | `/api/ads/events/` | [ad_events.ad_event](files/game/ad_events.py.md) | POST JSON·session·CSRF | event_id/event_type/created; 뷰 오류400/401/409/503, method405·CSRF403 |
+| `/api/ads/context/` | [views.ad_context](files/game/views.py.md) | GET·session | subject/context; 성공 no-store, 오류401/404/503·method405 |
 | `/accounts/…` | Django auth.urls include | Django 내장 뷰 계약 | 로그인·로그아웃 등 |
 | `/admin/…` | admin.site.urls | Django admin 계약 | game/admin.py는 현재 모델 등록 없음 |
 
@@ -88,18 +89,27 @@ publish_game_events
 
 transition은5번째 step에서 done/truncated=True, terminated=False이며 reward는 coins의 증가량, policy_version은 manual-v1이다. 사실 envelope은 `{schema_version:1,event_id,event_type,player_id,room_id,event_time,payload}`다. UUID event_id는 문자열, player_id는 정수, event_time은 timezone을 포함한 ISO 문자열이다. published_at은 Kafka 발행 진행 상태이며 envelope에는 포함하지 않는다. ack 후 DB 기록 전 장애는 재전송을 만들 수 있어 downstream은 event_id로 중복을 다뤄야 한다.
 
-## 광고 선택·이벤트 호출
+## 광고 공개 context·선택·이벤트 호출
 
 ```text
+GET /api/ads/context/
+  views.ad_context
+    session user -> Player -> request_context(player)
+      POST ad_server /api/media/context/ {subject}
+      headers: X-Media-ID + X-Media-Key; timeout=1.5초
+      subject 일치·공개 context 필드/타입/시간대 검사
+    {subject,context} + Cache-Control:no-store
+
 POST /api/ads/decision/ {slot_id}
   views.ad_decision
     session user -> Player
     slot whitelist(village-board,lobby-banner)
     request_decision(player,slot_id)
+      request_context(player): 공개 context 조회·검증; timeout=1.5초
       POST ad_server /api/media/decision/
       headers: X-Media-ID + X-Media-Key
       body: media_id + subject{media_id,subject_id=str(Player.pk)}
-            + slot_id + context{}
+            + slot_id + 조회한 context; timeout=1.5초
       empty/ad=null 정규화 또는 slot_id 검사
 
 POST /api/ads/events/ {decision_id,event_type}
@@ -117,6 +127,8 @@ POST /api/ads/events/ {decision_id,event_type}
 `game:ad-events`는 `/api/ads/events/`로 reverse된다. CSRF middleware가 요청을 먼저 거부하면403이며, 뷰에 도달한 요청은 POST 제한405 → 미인증401 → Player 없음409 → JSON/입력 검사 순으로 처리한다. JSON 파싱 실패, 잘못된 키 집합, gateway의 로컬 입력 검증 실패는400 `ad_event_rejected`다. gateway는 decision_id가 비어 있지 않은128자 이하 문자열인지 검사하며 UUID 형식 자체는 검사하지 않는다.
 
 subject는 조회 번호나 문자열 하나가 아니라 `{media_id,subject_id}` 객체다. 클라이언트는 subject/campaign_id를 이벤트 API에 넘기지 않는다. 선택된 **decision_id**와 impression/click만 보낸다. Player PK, campaign ID, bid 문서 ID는 decision ID의 대체값이 아니다. 실제 표시 여부와 클릭 순서의 판단은 클라이언트와 광고 서버가 맡으며 게임 bridge는 표시를 추정하거나 임의 impression을 만들지 않는다.
+
+공개 context는 광고 서버의 응답이며 현재 Player 행을 직접 복사하지 않는다. 빈 dict도 허용하고, 비어 있지 않으면 player_id/room_id/coins/version/updated_at 다섯 필드와 subject 일치·정수·시간대를 검사한다. 조회 실패 시 선택 요청도503으로 끝난다. GET context의 미인증은401, Player 없음은404, upstream/검증 실패는503이다.
 
 선택 응답은 기존 광고/이미지 필드를 보존하면서 body/bid_amount 기본 필드를 보완한다. 이벤트200의 created=False도 중복 접수에 대한 정상 응답이다. 이벤트400의 안전한 code는 decision_snapshot_missing, decision_not_found_for_subject, impression_required, decision_id_required, event_type_invalid이며 그 밖의 거절은 ad_event_rejected다. upstream503·통신/검증 실패는503으로 나타낸다. 서버 간 비200 중503 이외는 ValueError를 통해 게임 bridge의400으로 매핑한다. 광고 서버의 임의 원문 오류를 그대로 보내지 않는다.
 
@@ -171,7 +183,7 @@ manage.py export_player_snapshot --output <경로>
 
 ## 범위와 제외 목록
 
-CORE 문서는30개 Python 파일·78개 AST 기호를 포함한다. 설정/URL/admin처럼 기호가0개인 파일도 모듈 등록 값과 순서를 문서화했다. 함수 안의 decorator closure는 top-level inventory에 포함하지 않지만 viewer_methods의 실행 흐름에서 설명했다.
+CORE 문서는30개 Python 파일·80개 AST 기호를 포함한다. 설정/URL/admin처럼 기호가0개인 파일도 모듈 등록 값과 순서를 문서화했다. 함수 안의 decorator closure는 top-level inventory에 포함하지 않지만 viewer_methods의 실행 흐름에서 설명했다.
 
 제외한 테스트: `game/tests.py`, `game/test_ad_gateway.py`, `game/test_transforms.py`. 제외한 migration: `game/migrations/0001_initial.py`, `game/migrations/__init__.py` 및 migrations 하위 전체. 제외한 빈 패키지 파일: `config/__init__.py`, `game/__init__.py`. analytics·spark·tools는 [전체 라우팅 목차](README.md)와 [분석 흐름 문서](analytics-overview.md)에 연결되어 있다. template/static/설정 환경값/DB 실제 데이터와 실행 중 서버 상태는 이 Python routing inventory의 대상이 아니다.
 

@@ -6,7 +6,7 @@
 
 ## 값과 데이터 계약
 
-`urlpatterns`: play/ → play, api/player/ → player_view, api/delivery/ → delivery_view, api/history/ → history, api/auth/csrf/ → csrf_view, api/auth/login/ → api_login, ads-preview/ → ad_preview, api/ads/decision/ → ad_decision, api/ads/events/ → ad_events.ad_event. 이벤트 경로 이름은 `ad-events`이며 namespace를 포함한 reverse 이름은 `game:ad-events`다. 모든 URL은 config의 빈 prefix include 아래이므로 위 문자열이 그대로 루트 경로다.
+`urlpatterns`: play/ → play, api/player/ → player_view, api/delivery/ → delivery_view, api/history/ → history, api/auth/csrf/ → csrf_view, api/auth/login/ → api_login, ads-preview/ → ad_preview, api/ads/decision/ → ad_decision, api/ads/events/ → ad_events.ad_event, api/ads/context/ → ad_context. 이벤트 경로 이름은 `ad-events`이며 namespace를 포함한 reverse 이름은 `game:ad-events`다. 공개 context 경로 이름은 `ad-context`이며 reverse는 `game:ad-context`다. 모든 URL은 config의 빈 prefix include 아래이므로 위 문자열이 그대로 루트 경로다.
 
 ## 연결
 
@@ -18,4 +18,4 @@
 
 ## 확인 범위
 
-2026-10-07 실제 Python 소스를 AST로 읽고 호출 흐름을 대조했다. 서비스 모듈 import, .env 읽기, DB·Kafka 접속 또는 원본 코드 변경을 하지 않았다. 실행 환경의 정상 동작을 보증하는 런타임 테스트 결과와는 구분한다.
+2026-10-13 `fedffd8` 이후 URL 추가와 호출 흐름을 대조했다. 이 정적 대조는 프로젝트 모듈 import나 DB·Kafka·광고 서버 연결 없이 수행했다. 실행 환경의 정상 동작을 보증하는 런타임 테스트 결과와는 구분한다.

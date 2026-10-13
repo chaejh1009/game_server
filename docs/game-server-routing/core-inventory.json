@@ -46,12 +46,17 @@
     "request_decision": {
       "kind": "function",
       "signature": "def request_decision(player, slot_id)",
-      "line": 93
+      "line": 146
     },
     "request_ad_event": {
       "kind": "function",
       "signature": "def request_ad_event(player, decision_id, event_type)",
-      "line": 146
+      "line": 178
+    },
+    "request_context": {
+      "kind": "function",
+      "signature": "def request_context(player)",
+      "line": 222
     }
   },
   "game/admin.py": {},
@@ -176,42 +181,47 @@
     "player_view": {
       "kind": "function",
       "signature": "def player_view(request)",
-      "line": 15
+      "line": 17
     },
     "play": {
       "kind": "function",
       "signature": "def play(request)",
-      "line": 22
+      "line": 24
     },
     "delivery_view": {
       "kind": "function",
       "signature": "def delivery_view(request)",
-      "line": 26
+      "line": 28
     },
     "history": {
       "kind": "function",
       "signature": "def history(request)",
-      "line": 43
+      "line": 45
     },
     "csrf_view": {
       "kind": "function",
       "signature": "def csrf_view(request)",
-      "line": 55
+      "line": 57
     },
     "api_login": {
       "kind": "function",
       "signature": "def api_login(request)",
-      "line": 62
+      "line": 64
     },
     "ad_preview": {
       "kind": "function",
       "signature": "def ad_preview(request)",
-      "line": 97
+      "line": 99
     },
     "ad_decision": {
       "kind": "function",
       "signature": "def ad_decision(request)",
-      "line": 102
+      "line": 104
+    },
+    "ad_context": {
+      "kind": "function",
+      "signature": "def ad_context(request)",
+      "line": 125
     }
   },
   "game/management/commands/consume_game_sample.py": {

@@ -6,9 +6,9 @@
 
 ## 값과 데이터 계약
 
-subject는 `{media_id: settings.ADS_MEDIA_ID, subject_id: str(player.pk)}` 객체다. UUID decision_id는 광고 결정의 식별자이며 Player ID 또는 campaign ID와 교환할 수 없다. `X-Media-ID`와 `X-Media-Key`는 두 gateway 호출 모두 서버에서 붙인다. timeout은 3초다.
+subject는 `{media_id: settings.ADS_MEDIA_ID, subject_id: str(player.pk)}` 객체다. UUID decision_id는 광고 결정의 식별자이며 Player ID 또는 campaign ID와 교환할 수 없다. `X-Media-ID`와 `X-Media-Key`는 두 gateway 호출 모두 서버에서 붙인다. `call_ads`의 timeout은 3초이며 `request_context`와 `request_decision`의 HTTP 호출은 각각 1.5초다.
 
-두 선택 경로가 공존한다. `decision` → `media_payload` → `call_ads`는 GET 뷰지만 현재 URL 순서상 가려진다. 실제 POST 선택은 `views.ad_decision` → `request_decision`이며 context={}를 보낸다. 이 차이를 임의로 합쳐 설명하지 않는다.
+두 선택 경로가 공존한다. `decision` → `media_payload` → `call_ads`는 GET 뷰지만 현재 URL 순서상 가려진다. 실제 POST 선택은 `views.ad_decision` → `request_decision` → `request_context`로 광고 서버의 공개 context를 먼저 조회한 뒤 선택 요청에 넣는다. 이 차이를 임의로 합쳐 설명하지 않는다.
 
 ## 연결
 
@@ -63,22 +63,31 @@ subject는 `{media_id: settings.ADS_MEDIA_ID, subject_id: str(player.pk)}` 객�
 
 ## `def request_decision(player, slot_id)`
 
-소스 기호: `request_decision` · 정의 줄: 93.
+소스 기호: `request_decision` · 정의 줄: 146.
 
 - **입력·역할:** 인증 사용자에게 연결된 player와 허용 slot_id를 받는다. slot whitelist는 호출 뷰가 검사한다.
-- **검사·변환:** media key가 비면 AdsUnavailable. media_id+subject+slot_id+context={} POST. 응답 dict 검사 후 empty=true 또는 ad=null은 {ad:None}으로 정규화하고, 선택 결과는 slot 일치 검사를 한다.
-- **직접 호출:** `Request` → `json.dumps` → `urlopen(timeout=3)` → `json.load`; dict 확장으로 기존 이미지/식별 필드를 보존한다.
-- **반환·상태:** 선택 dict에 body 기본""와 bid_amount(bid_units fallback)를 추가한다. HTTPError/URLError/TimeoutError/OSError/ValueError/KeyError/TypeError를 AdsUnavailable로 변환한다. decision 저장·노출 기록은 하지 않는다.
+- **검사·변환:** media key가 비면 AdsUnavailable. `request_context(player)`로 조회·검증한 context를 media_id+subject+slot_id와 함께 POST한다. 빈 context={}도 허용한다. 응답 dict 검사 후 empty=true 또는 ad=null은 {ad:None}으로 정규화하고, 선택 결과는 slot 일치 검사를 한다.
+- **직접 호출:** `request_context(player)` → `Request` → `json.dumps` → `urlopen(timeout=1.5)` → `json.load`; dict 확장으로 기존 이미지/식별 필드를 보존한다.
+- **반환·상태:** 선택 dict에 body 기본""와 bid_amount(bid_units fallback)를 추가한다. HTTPError/URLError/TimeoutError/OSError/ValueError/KeyError/TypeError를 AdsUnavailable로 변환한다. context 조회 실패는 선택 요청 전 AdsUnavailable로 전파된다. context 호출과 선택 Request 생성/직렬화는 선택 응답 try 밖이다. decision 저장·노출 기록은 하지 않는다.
 
 ## `def request_ad_event(player, decision_id, event_type)`
 
-소스 기호: `request_ad_event` · 정의 줄: 146.
+소스 기호: `request_ad_event` · 정의 줄: 178.
 
 - **입력·역할:** player, decision_id 문자열, event_type(impression/click)을 받는다.
 - **검사·변환:** 키 없음은 AdsUnavailable. 빈/128자 초과/비문자열 ID나 잘못된 event_type은 ValueError("invalid_ad_event")이며 이벤트 뷰가400 ad_event_rejected로 변환한다. UUID 형식 검사는 하지 않는다. subject를 Player에서 구성한다. upstream503만 AdsUnavailable, 다른 비200은 whitelist ValueError다.
 - **직접 호출:** `call_ads("/api/media/events/",payload)` → 응답 event_id/event_type/created 검증.
 - **반환·상태:** event_id가 decision_id+":"+event_type이고 created가 정확한 bool일 때 세 필드만 반환한다. 응답 형태 불일치는 AdsUnavailable. created=False도200 성공이며 중복 접수 뜻이다. 서버 간401/403/404 등의 비200은 게임 bridge에서400 ad_event_rejected로 변환된다.
 
+## `def request_context(player)`
+
+소스 기호: `request_context` · 정의 줄: 222.
+
+- **입력·역할:** 로그인 Player를 사용해 광고 서버에 저장된 공개 context를 조회한다. 현재 MySQL Player 상태를 context로 복사하거나 snapshot을 업로드하지 않는다.
+- **검사·변환:** 키가 없으면 AdsUnavailable. `{subject: {media_id, subject_id: str(player.pk)}}`를 POST한다. 응답은 dict, subject는 요청과 같고 context는 dict여야 한다. 빈 context는 허용한다. 비어 있지 않으면 정확히 player_id/room_id/coins/version/updated_at 다섯 키를 요구하며 player_id는 subject_id와 같아야 한다. room_id는 문자열, coins/version은 bool을 제외한 int이며 version은 0 이상이다. updated_at은 시간대가 있는 ISO 문자열이어야 한다.
+- **직접 호출:** `Request` → `json.dumps(..., allow_nan=False).encode("utf-8")` → `urlopen(timeout=1.5)` → `json.load` → `datetime.fromisoformat` → `dict(context)`. 대상은 `/api/media/context/`이고 Content-Type/Accept/X-Media-ID/X-Media-Key를 붙인다.
+- **반환·상태:** 검사한 context의 새 dict를 반환한다. HTTPError/URLError/TimeoutError/OSError/ValueError/KeyError/TypeError는 try 안에서 AdsUnavailable로 변환한다. Request 생성/직렬화는 try 밖이다. 광고 선택·노출·게임 DB 변경은 하지 않는다.
+
 ## 확인 범위
 
-2026-10-07 실제 Python 소스를 AST로 읽고 호출 흐름을 대조했다. 서비스 모듈 import, .env 읽기, DB·Kafka 접속 또는 원본 코드 변경을 하지 않았다. 실행 환경의 정상 동작을 보증하는 런타임 테스트 결과와는 구분한다.
+2026-10-13 `fedffd8` 이후 AST 변경 기호와 Git diff의 호출 흐름을 대조했다. 이 정적 대조는 프로젝트 모듈 import나 DB·Kafka·광고 서버 연결 없이 수행했다. 실행 환경의 정상 동작을 보증하는 런타임 테스트 결과와는 구분한다.

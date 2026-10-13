@@ -90,58 +90,90 @@ class AdsUnavailable(Exception):
     pass
 
 
+# def request_decision(player, slot_id):
+#     media_id = settings.ADS_MEDIA_ID
+#     if not settings.ADS_MEDIA_KEY:
+#         raise AdsUnavailable("media_key_missing")
+
+#     payload = {
+#         "media_id": media_id,
+#         "subject": {
+#             "media_id": media_id,
+#             "subject_id": str(player.pk),
+#         },
+#         "slot_id": slot_id,
+#         "context": {},
+#     }
+#     request = Request(
+#         settings.ADS_BASE_URL.rstrip("/") + "/api/media/decision/",
+#         data=json.dumps(payload).encode("utf-8"),
+#         headers={
+#             "Content-Type": "application/json",
+#             "Accept": "application/json",
+#             "X-Media-ID": media_id,
+#             "X-Media-Key": settings.ADS_MEDIA_KEY,
+#         },
+#         method="POST",
+#     )
+
+#     try:
+#         with urlopen(request, timeout=3) as response:
+#             data = json.load(response)
+
+#         if not isinstance(data, dict):
+#             raise ValueError("invalid_response")
+
+#         # 현재 광고 서버의 빈 광고 응답을 처리한다.
+#         if data.get("empty") is True or data.get("ad", "selected") is None:
+#             return {**data, "ad": None}
+
+#         if data.get("slot_id") != slot_id:
+#             raise ValueError("slot_mismatch")
+
+#         # 이미지 경로와 기존 필드를 보존하고 확인 화면용 필드를 추가한다.
+#         return {
+#             **data,
+#             "body": data.get("body", ""),
+#             "bid_amount": data.get("bid_amount", data.get("bid_units")),
+#         }
+
+#     except (
+#         HTTPError, URLError, TimeoutError, OSError,
+#         ValueError, KeyError, TypeError,
+#     ) as error:
+#         raise AdsUnavailable("ads_unavailable") from error
+
 def request_decision(player, slot_id):
     media_id = settings.ADS_MEDIA_ID
     if not settings.ADS_MEDIA_KEY:
         raise AdsUnavailable("media_key_missing")
-
     payload = {
         "media_id": media_id,
-        "subject": {
-            "media_id": media_id,
-            "subject_id": str(player.pk),
-        },
+        "subject": {"media_id": media_id, "subject_id": str(player.pk)},
         "slot_id": slot_id,
-        "context": {},
+        "context": request_context(player),
     }
     request = Request(
         settings.ADS_BASE_URL.rstrip("/") + "/api/media/decision/",
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-Media-ID": media_id,
-            "X-Media-Key": settings.ADS_MEDIA_KEY,
-        },
+        headers={"Content-Type": "application/json", "Accept": "application/json",
+                 "X-Media-ID": media_id, "X-Media-Key": settings.ADS_MEDIA_KEY},
         method="POST",
     )
-
     try:
-        with urlopen(request, timeout=3) as response:
+        with urlopen(request, timeout=1.5) as response:
             data = json.load(response)
-
         if not isinstance(data, dict):
             raise ValueError("invalid_response")
-
-        # 현재 광고 서버의 빈 광고 응답을 처리한다.
         if data.get("empty") is True or data.get("ad", "selected") is None:
             return {**data, "ad": None}
-
         if data.get("slot_id") != slot_id:
             raise ValueError("slot_mismatch")
-
-        # 이미지 경로와 기존 필드를 보존하고 확인 화면용 필드를 추가한다.
-        return {
-            **data,
-            "body": data.get("body", ""),
-            "bid_amount": data.get("bid_amount", data.get("bid_units")),
-        }
-
-    except (
-        HTTPError, URLError, TimeoutError, OSError,
-        ValueError, KeyError, TypeError,
-    ) as error:
+        return {**data, "body": data.get("body", ""),
+                "bid_amount": data.get("bid_amount", data.get("bid_units"))}
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError) as error:
         raise AdsUnavailable("ads_unavailable") from error
+
 
 def request_ad_event(player, decision_id, event_type):
     """Use the logged-in player's identity; clients supply only the event target."""
@@ -186,3 +218,50 @@ def request_ad_event(player, decision_id, event_type):
         raise AdsUnavailable("invalid_ad_event_response")
 
     return {name: data[name] for name in ("event_id", "event_type", "created")}
+
+def request_context(player):
+    media_id = settings.ADS_MEDIA_ID
+    if not settings.ADS_MEDIA_KEY:
+        raise AdsUnavailable("media_key_missing")
+    # [문제 1 · 여러 줄] 서버의 Player로 subject와 조회 payload를 만든다. (2줄)
+    # 예시: member = {"group_id": group_id, "member_id": str(member.pk)}
+    #       packet = {"member": member}
+    subject = {"media_id": media_id, "subject_id": str(player.pk)}
+    payload = {"subject": subject}
+
+    # [문제 2 · 한 줄] JSON·Accept·매체 ID·키 헤더 사전을 headers에 대입한다.
+    # 예시: other_headers = {"Content-Type": "application/json", "Accept": "application/json", "X-Group-ID": group_id, "X-Group-Key": group_key}
+    headers = {"Content-Type": "application/json", "Accept": "application/json", "X-Media-ID": media_id, "X-Media-Key": settings.ADS_MEDIA_KEY}
+
+    request = Request(
+        settings.ADS_BASE_URL.rstrip("/") + "/api/media/context/",
+        data=json.dumps(payload, allow_nan=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        # [문제 3 · 한 단어] 이번 조회의 소켓 timeout을 초 단위로 채운다.
+        # 힌트 3: 뒤 decision 호출과 함께 각각 1.5초를 사용한다.
+        with urlopen(request, timeout=1.5) as response:
+            data = json.load(response)
+        if (not isinstance(data, dict) or data.get("subject") != subject
+                or not isinstance(data.get("context"), dict)):
+            raise ValueError("invalid_context_response")
+        context = data["context"]
+        if context:
+            if (set(context) != {"player_id", "room_id", "coins", "version", "updated_at"}
+                    or context["player_id"] != subject["subject_id"]
+                    or not isinstance(context["room_id"], str)
+                    or type(context["coins"]) is not int
+                    or type(context["version"]) is not int or context["version"] < 0
+                    or not isinstance(context["updated_at"], str)):
+                raise ValueError("invalid_public_context")
+            instant = datetime.fromisoformat(context["updated_at"])
+            if instant.tzinfo is None or instant.utcoffset() is None:
+                raise ValueError("context_time_requires_timezone")
+        # [문제 4 · 한 줄] 검사한 context의 새 사전을 반환한다.
+        # 예시: return dict(detail)
+        return dict(context)
+
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError) as error:
+        raise AdsUnavailable("ads_unavailable") from error

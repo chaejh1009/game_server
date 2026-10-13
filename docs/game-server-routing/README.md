@@ -4,11 +4,11 @@
 
 ## 범위
 
-직접 유지보수하는 런타임 Python **86파일·142개 클래스/함수/메서드**를 다룬다. 각 파일은 `files/<프로젝트 상대경로>.md` 하나에 대응한다. `manage.py`, `config`, `game`, `analytics`, `spark_jobs`, `tools`를 포함한다.
+직접 유지보수하는 런타임 Python **86파일·144개 클래스/함수/메서드**를 다룬다. 각 파일은 `files/<프로젝트 상대경로>.md` 하나에 대응한다. `manage.py`, `config`, `game`, `analytics`, `spark_jobs`, `tools`를 포함한다.
 
 테스트(`tests.py`, `test_*.py`), migrations, 빈 `__init__.py`, 교시별 독립 연습인 `tools/basics/**`, 가상환경·캐시·DB·데이터 산출물·`.env`는 제외한다. 템플릿·정적 파일은 소비하는 view의 문서에서 참조한다. 설정은 변수명과 경로 해석 규칙으로 설명하고 비밀값은 기록하지 않는다.
 
-전체 파일의 클래스·함수·직접 선언한 메서드 서명과 정의 줄은 [전체 AST 목록](routing-inventory.json)에 기록한다. [핵심 서버 AST 목록](core-inventory.json)은 `manage.py`, `config`, `game`의 30파일·78개 기호만 담는다.
+전체 파일의 클래스·함수·직접 선언한 메서드 서명과 정의 줄은 [전체 AST 목록](routing-inventory.json)에 기록한다. [핵심 서버 AST 목록](core-inventory.json)은 `manage.py`, `config`, `game`의 30파일·80개 기호만 담는다.
 
 ## 계층별 호출 구조
 
@@ -47,6 +47,7 @@ tools -> 표본 검증 / Bronze 보존·사본 / 전이 인계 / 실제 WS 부�
 | `/ads-preview/` | views.ad_preview | GET, 로그인 불필요 | 광고 확인 HTML |
 | `/api/ads/decision/` | views.ad_decision | POST JSON·session·CSRF | 선택 또는 빈 광고 dict; 오류400/401/404/503 |
 | `/api/ads/events/` | [ad_events.ad_event](files/game/ad_events.py.md) | POST JSON·session·CSRF | event_id/event_type/created; 뷰 오류400/401/409/503, method405·CSRF403 |
+| `/api/ads/context/` | [views.ad_context](files/game/views.py.md) | GET·session | subject/context; 성공 no-store, 오류401/404/503·method405 |
 | `/accounts/…` | Django auth.urls include | Django 내장 뷰 계약 | 로그인·로그아웃 등 |
 | `/admin/…` | admin.site.urls | Django admin 계약 | game/admin.py는 현재 모델 등록 없음 |
 
@@ -99,7 +100,7 @@ tools -> 표본 검증 / Bronze 보존·사본 / 전이 인계 / 실제 WS 부�
 | `game/services.py` | [문서](files/game/services.py.md) | 게임 규칙, 명령 멱등 처리, 전이 데이터, Player와 GameEvent의 원자적 저장을 소유한다. 네트워크 전송과 광고 선택은 하지 않는다. |
 | `game/transforms.py` | [문서](files/game/transforms.py.md) | Kafka 사실 envelope을 검증하고 허용 게임 행동에 한국어 표시 이름을 붙이는 순수 변환 모듈이다. consumer group·offset·전송은 소유하지 않는다. |
 | `game/urls.py` | [문서](files/game/urls.py.md) | 인증된 게임 HTTP와 광고 bridge의 경로를 등록한다. app_name은 game이며 실제 인증·CSRF·method 판정은 뷰와 middleware가 수행한다. |
-| `game/views.py` | [문서](files/game/views.py.md) | 게임 상태 HTTP 조회, 세션 로그인, CSRF 발급, 광고 선택 POST를 처리한다. 게임 상태 변경은 WebSocket 서비스가 소유한다. |
+| `game/views.py` | [문서](files/game/views.py.md) | 게임 상태 HTTP 조회, 세션 로그인, CSRF 발급, 광고 선택 POST와 공개 context GET을 처리한다. 게임 상태 변경은 WebSocket 서비스가 소유한다. |
 | `manage.py` | [문서](files/manage.py.md) | Django 관리 명령의 프로세스 진입점이다. 게임 규칙이나 Kafka 전송을 직접 구현하지 않고 Django 명령 탐색기에 argv를 넘긴다. |
 
 ### 게임 관리 명령
@@ -203,6 +204,8 @@ tools -> 표본 검증 / Bronze 보존·사본 / 전이 인계 / 실제 WS 부�
 
 ## 최근 정적 점검
 
-2026-10-12 기준 런타임 Python 86파일·142개 기호의 파일별 문서 대응과 정확한 서명을 대조했다. 누락·삭제된 파일의 잔존 문서·서명 불일치는 없으며 핵심 서버 AST 목록도 현재 소스와 일치한다. 라우팅 문서의 상대 파일 링크도 검사했다.
+2026-10-13 기준 런타임 Python 86파일·144개 기호의 파일별 문서 대응과 정확한 서명을 대조했다. 누락·삭제된 파일의 잔존 문서·서명 불일치는 없으며 핵심 서버 AST 목록(30파일·80개 기호)도 현재 소스와 일치한다. 라우팅 문서의 상대 파일 링크도 검사했다.
 
-최근 추가된 광고 이벤트 bridge와 Player snapshot export는 `b19eaf7` 이후 Git diff의 함수 서명·변경 구간을 문서 설명과 비교했다. 현재 작업 트리에 새 Python 변경은 없다. 프로젝트 모듈 import나 DB·Kafka·Spark·광고 서버 실행 없이 수행한 정적 확인이다.
+직전 커밋 `fedffd8` 이후 `game/ad_gateway.py`, `game/views.py`, `game/urls.py`의 diff를 비교했다. 공개 context GET과 `request_context`의 응답 검증, 광고 선택 전 context 조회, 두 HTTP 호출의 각각 1.5초 timeout을 반영했다. AST 비교 도구는 저장소 루트의 파일별 문서 경로에 맞추도록 임시 사본의 source-root 처리를 보완해 사용했다. 정적 점검은 DB·Kafka·Spark·광고 서버의 실제 연결 성공을 증명하지 않는다.
+
+Django 시스템 점검(`manage.py check`)과 기존 테스트 11건(`manage.py test`)도 통과했다. 새 공개 context API와 POST 선택 경로의 통합 동작은 기존 테스트 범위에 포함되지 않는다.
